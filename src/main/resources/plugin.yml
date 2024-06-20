@@ -1,0 +1,21 @@
+name: SimpleBoatRaces
+main: net.cmr.simpleboatraces.SimpleBoatRaces
+version: 0.0.0
+author: Cmrboy26
+api-version: '1.20'
+commands:
+ boatraces:
+  description: The base command for boat races
+  usage: /<command> [arg]
+  aliases: [boats, ibr, bra]
+permissions:
+ cmr.boatraces.list:
+  default: true
+ cmr.boatraces.join:
+  default: true
+ cmr.boatraces.quickstart:
+  default: false
+ cmr.boatraces.admin:
+  default: op
+ cmr.boatraces.unlockall:
+  default: false
