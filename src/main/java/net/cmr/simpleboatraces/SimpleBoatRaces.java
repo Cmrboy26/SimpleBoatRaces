@@ -3,13 +3,16 @@ package net.cmr.simpleboatraces;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.command.CommandSender;
@@ -17,9 +20,9 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.configuration.serialization.ConfigurationSerialization;
-import org.bukkit.entity.Boat.Type;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Vehicle;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
@@ -34,7 +37,9 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.vehicle.VehicleDestroyEvent;
+import org.bukkit.event.vehicle.VehicleEnterEvent;
 import org.bukkit.event.vehicle.VehicleExitEvent;
+import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -42,10 +47,18 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import net.cmr.simpleboatraces.BoatRace.BoatRaceConfiguration;
 import net.cmr.simpleboatraces.BoatRace.RaceState;
-import net.cmr.simpleboatraces.ui.SelectorGUI;
+import net.cmr.simpleboatraces.PlayerData.HonkSound;
+import net.cmr.simpleboatraces.PlayerData.TrailEffect;
+import net.cmr.simpleboatraces.ui.HornSelectorGUI;
+import net.cmr.simpleboatraces.ui.BoatSelectorGUI;
+import net.cmr.simpleboatraces.ui.TrailSelectorGUI;
 import net.md_5.bungee.api.ChatColor;
 
 public final class SimpleBoatRaces extends JavaPlugin implements Listener {
+
+	// TODO: Add a way to ensure that two or more minigame plugins don't conflict with each other
+	// Maybe store commands in the config that should be run when a player joins an activity
+	// Probably make a lobby plugin that handles all of this. Make each minigame plugin extend a minigame class that has the methods needed to accomplish this
 
 	static {
         ConfigurationSerialization.registerClass(BoatRaceConfiguration.class);
@@ -248,6 +261,24 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener {
 			event.setCancelled(true);
 		}
 	}
+
+	@EventHandler
+	public void onVehicleEnter(VehicleEnterEvent event) {
+		Entity exitedEntity = event.getEntered();
+		if (!(exitedEntity instanceof Player)) {
+			return;
+		}
+		Player player = (Player) exitedEntity;
+		BoatRace race = manager.getPlayerRace(player);
+		if (race != null) {
+			Vehicle vehicle = event.getVehicle();
+			// Don't let people get into a boat with other people
+			if (vehicle.getPassengers().size() >= 1) {
+				event.setCancelled(true);
+				return;
+			}
+		}
+	}
 	
 	@EventHandler
 	public void onVehicleDestroy(VehicleDestroyEvent event) {
@@ -296,13 +327,19 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener {
 	    		if (name.equals(BoatRace.HORN_NAME)) {
 	    			e.setCancelled(true);
 	    			return;
-	    		} else if (name.contains(BoatRace.LEAVE_GAME_NAME)) {
+	    		} else if (name.contains(BoatRace.HORN_SELECTOR_NAME)) {
+					e.setCancelled(true);
+					return;
+				} else if (name.contains(BoatRace.LEAVE_GAME_NAME)) {
 	    			e.setCancelled(true);
 	    			return;
 	    		} else if (name.contains(BoatRace.BOAT_SELECTOR_NAME)) {
 	    			e.setCancelled(true);
 	    			return;
 	    		} else if (name.contains(BoatRace.FAST_START_GAME_NAME)) {
+	    			e.setCancelled(true);
+	    			return;
+	    		} else if (name.contains(BoatRace.PARTICLE_SELECTOR_NAME)) {
 	    			e.setCancelled(true);
 	    			return;
 	    		}
@@ -321,6 +358,38 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener {
 	    }
 	}
 	
+	@EventHandler
+	public void onBoatMove(VehicleMoveEvent move) {
+		for (Entity passenger : move.getVehicle().getPassengers()) {
+			if (passenger instanceof Player) {
+				Player player = (Player) passenger;
+				BoatRace race = manager.getPlayerRace(player);
+				if (race != null) {
+					TrailEffect effect = getPlayerData(player).getTrailEffect();
+					if (effect == null || effect.effect == null) {
+						return;
+					}
+					Location playAt = move.getTo().clone().add(0, 0.5, 0);
+					double spread = 0;
+					if (effect.quantity > 1) {
+						spread = 0.2d * effect.quantity;
+					}
+
+					double data = 0;
+					if (effect == TrailEffect.SMOKE) {
+						data = .03d;
+						spread = 0;
+					}
+					if (effect == TrailEffect.CHERRY_LEAVES) {
+						data = 1.3d;
+					}
+
+					playAt.getWorld().spawnParticle(effect.effect, playAt, effect.quantity, spread, spread, spread, data);
+				}
+			}
+		}
+	}
+
 	@EventHandler
 	public void onPlayerBreak(BlockBreakEvent e) {
 		BoatRace race = manager.getPlayerRace(e.getPlayer());
@@ -353,9 +422,14 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener {
 	    	ItemStack held = p.getInventory().getItemInMainHand();
 	    	if (held.hasItemMeta()) {
 	    		String name = held.getItemMeta().getDisplayName();
-	    		if (name.contains(BoatRace.BOAT_SELECTOR_NAME)) {
-	    			// Holding the selector while in game. Change their desired boat.
-	    			SelectorGUI gui = new SelectorGUI(this, p);
+	    		if (name.contains(BoatRace.PARTICLE_SELECTOR_NAME)) {
+					TrailSelectorGUI gui = new TrailSelectorGUI(this, p);
+					gui.showGUI();
+	    		} else if (name.contains(BoatRace.BOAT_SELECTOR_NAME)) {
+	    			BoatSelectorGUI gui = new BoatSelectorGUI(this, p);
+	    			gui.showGUI();
+	    		} else if (name.contains(BoatRace.HORN_SELECTOR_NAME)) {
+	    			HornSelectorGUI gui = new HornSelectorGUI(this, p);
 	    			gui.showGUI();
 	    		} else if (name.contains(BoatRace.FAST_START_GAME_NAME)) {
 	    			race.quickstart();
@@ -369,21 +443,36 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener {
 	    }
 	}
 	
+	Random rareHonkRandom = new Random();
+	
+	HashSet<Player> honkCooldown = new HashSet<>();
+
 	public void honk(Player p) {
-		BukkitRunnable honkTask = new BukkitRunnable() {
-			@Override
-			public void run() {
-				p.getWorld().playSound(p, Sound.ENTITY_COW_HURT, 2, 2);
-			}
-		};
-		honkTask.runTaskLater(this, 0);
-		/*honkTask = new BukkitRunnable() {
-			@Override
-			public void run() {
-				p.getWorld().playSound(p, Sound.ENTITY_COW_HURT, 1, 2);
-			}
-		};
-		honkTask.runTaskLater(this, 4);*/
+		HonkSound honkSound = getPlayerData(p).getHonkSound();
+		Sound sound = honkSound.sound;
+
+		if (honkCooldown.contains(p)) {
+			return;
+		}
+
+		if (honkSound.tickCooldown > 0) {
+			honkCooldown.add(p);
+			BukkitRunnable honkTask = new BukkitRunnable() {
+				@Override
+				public void run() {
+					honkCooldown.remove(p);
+				}
+			};
+			honkTask.runTaskLater(this, honkSound.tickCooldown);
+		}
+
+		float pitch = honkSound.pitch;
+
+		if (rareHonkRandom.nextInt(200) == 0) {
+			p.getWorld().playSound(p, sound, 2, .5f);
+			return;
+		}
+		p.getWorld().playSound(p, sound, 2, pitch);
 	}
 	
 }

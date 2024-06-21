@@ -21,6 +21,9 @@ import org.bukkit.util.Vector;
 
 import net.cmr.simpleboatraces.BoatRace.BoatRaceConfiguration;
 import net.cmr.simpleboatraces.BoatRace.RaceState;
+import net.cmr.simpleboatraces.ui.HornSelectorGUI;
+import net.cmr.simpleboatraces.ui.BoatSelectorGUI;
+import net.cmr.simpleboatraces.ui.TrailSelectorGUI;
 import net.md_5.bungee.api.ChatColor;
 
 public class CommandManager implements CommandExecutor, TabCompleter {
@@ -83,8 +86,15 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 				return true;
 			}
 			
+			boolean playerCanJoinQueue = race.canQueueRace(player);
+
 			boolean playerCanJoin = race.canJoinRace(player);
 			if (!playerCanJoin) {
+				if (playerCanJoinQueue) {
+					race.joinQueue(player);
+					plugin.info(sender, ChatColor.RED + "You are now in the queue. Please wait for the race to end.");
+					return true;
+				}
 				plugin.info(sender, ChatColor.RED + "Cannot join this match.");
 				return true;
 			}
@@ -116,7 +126,13 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 				currentRace.leaveRace(player, true);
 				plugin.info(sender, "Leaving race...");
 			} else {
-				plugin.info(sender, ChatColor.RED + "You aren't in a race!");
+				BoatRace queuedRace = plugin.manager.getQueuedRace(player);
+				if (queuedRace != null) {
+					queuedRace.leaveQueue(player);
+					plugin.info(sender, "Leaving queue...");
+				} else {
+					plugin.info(sender, ChatColor.RED + "You aren't in a race!");
+				}
 			}
 			break;
 		}
@@ -406,6 +422,8 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 				message += "\n -"+ChatColor.YELLOW+" Level: "+ChatColor.WHITE+data.getLevel();
 				message += "\n -"+ChatColor.YELLOW+" XP to Level Up: "+ChatColor.WHITE+data.getXPToLevelUp();
 				message += "\n -"+ChatColor.YELLOW+" Boat Type: "+ChatColor.WHITE+Utils.capitalizeString(Utils.getBoatItem(boat, chestBoat).name().replaceAll("_", " ").toLowerCase());
+				message += "\n -"+ChatColor.YELLOW+" Honk Sound: "+ChatColor.WHITE+data.getHonkSound().name;
+				message += "\n -"+ChatColor.YELLOW+" Trail Effect: "+ChatColor.WHITE+data.getTrailEffect().name;
 				plugin.info(sender, message);
 				return true;
 			} catch (IOException e) {
@@ -421,6 +439,34 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 			plugin.info(sender, ChatColor.GREEN + "Reloading config...");
 			plugin.reloadMaps();
 			plugin.info(sender, ChatColor.GREEN + "Config reloaded.");
+			break;
+		}
+		case "boat": {
+			if (!canJoin) {
+				plugin.info(sender, getNoPermissionsString());
+				return true;
+			}
+			BoatSelectorGUI gui = new BoatSelectorGUI(plugin, player);
+			gui.showGUI();
+			break;
+		}
+		case "trail": {
+			if (!canJoin) {
+				plugin.info(sender, getNoPermissionsString());
+				return true;
+			}
+			TrailSelectorGUI gui = new TrailSelectorGUI(plugin, player);
+			gui.showGUI();
+			break;
+		}
+		case "honk":
+		case "horn": {
+			if (!canJoin) {
+				plugin.info(sender, getNoPermissionsString());
+				return true;
+			}
+			HornSelectorGUI gui = new HornSelectorGUI(plugin, player);
+			gui.showGUI();
 			break;
 		}
 		default: {
@@ -454,6 +500,9 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 				list.add("personalbest");
 				list.add("leaderboard");
 				list.add("stats");
+				list.add("boat");
+				list.add("trail");
+				list.add("horn");
 			}
 			if (canViewList) {
 				list.add("list");

@@ -1,5 +1,7 @@
 package net.cmr.simpleboatraces.ui;
 
+import java.util.Objects;
+
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -22,7 +24,7 @@ public class GUIListener implements Listener {
 	
 	@EventHandler
 	public void onClick(InventoryClickEvent event) {
-		if (event.getClickedInventory().equals(gui.getInventory())) {
+		if (Objects.equals(event.getClickedInventory(), gui.getInventory())) {
 			event.setCancelled(true);
 			int clickedSlot = event.getSlot();
 			for (Entry entry : gui.getEntries()) {
@@ -37,14 +39,14 @@ public class GUIListener implements Listener {
 	
 	@EventHandler
 	public void onOpen(InventoryOpenEvent event) {
-		if (event.getInventory().equals(gui.getInventory())) {
+		if (Objects.equals(event.getInventory(), gui.getInventory())) {
 			gui.onOpen(event);
 		}
 	}
 	
 	@EventHandler
 	public void onClose(InventoryCloseEvent event) {
-		if (event.getInventory().equals(gui.getInventory())) {
+		if (Objects.equals(event.getInventory(), gui.getInventory())) {
 			gui.onClose(event);
 			unregisterAll();
 		}

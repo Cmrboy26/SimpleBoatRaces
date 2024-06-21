@@ -56,6 +56,7 @@ public class BoatRace {
 	final int BOAT_RACE_HALFTIME_COUNTDOWN = 30;
 	
 	// Waiting Variables
+	HashSet<Player> queuedPlayers = new HashSet<>();
 	float waitCountdown = MINIMUM_PLAYERS_COUNTDOWN;
 	
 	// Starting Variables
@@ -74,7 +75,10 @@ public class BoatRace {
 	// Optional Powerup Variables
 	public volatile HashSet<Vector> removeBlocksOnReset = new HashSet<>();
 	
+	public static final String PARTICLE_SELECTOR_NAME = "" + ChatColor.AQUA + "Particle Selector";
 	public static final String BOAT_SELECTOR_NAME = "" + ChatColor.AQUA + "Boat Selector";
+	public static final String HORN_SELECTOR_NAME = "" + ChatColor.AQUA + "Horn Selector";
+
 	public static final String LEAVE_GAME_NAME = "" + ChatColor.RED + "Leave Game";
 	public static final String FAST_START_GAME_NAME = "" + ChatColor.GOLD + "Quick Start Game";
 	public static final String HORN_NAME = "" + ChatColor.GOLD + "Honk Horn";
@@ -121,6 +125,10 @@ public class BoatRace {
 	public boolean canJoinRace(Player player) {
 		return hasPermissionToJoinRace(player) && currentState == RaceState.WAITING;
 	}
+
+	public boolean canQueueRace(Player player) {
+		return hasPermissionToJoinRace(player) && currentState != RaceState.WAITING;
+	}
 	
 	/**
 	 * Overridable. Can be used to set custom conditions to see if a player can join the game.
@@ -138,6 +146,28 @@ public class BoatRace {
 		World lobbyWorld = plugin.getServer().getWorld(config.lobbyWorld);
 		return world != null && lobbyWorld != null && updateMethodTaskID != -1;
 	}
+
+	public void allowQueueIn() {
+		HashSet<Player> playersToJoin = new HashSet<>(queuedPlayers);
+		for (Player p : playersToJoin) {
+			if (canJoinRace(p)) {
+				joinRace(p);
+			} else {
+				leaveQueue(p);
+			}
+		}
+		queuedPlayers.clear();
+		playersToJoin.clear();
+	}
+
+	public void kickAllFromQueue() {
+		HashSet<Player> playersToLeave = new HashSet<>(queuedPlayers);
+		for (Player p : playersToLeave) {
+			leaveQueue(p);
+		}
+		queuedPlayers.clear();
+		playersToLeave.clear();
+	}
 	
 	// Runs every tick (1/20 of a second)
 	public void update() {
@@ -146,6 +176,7 @@ public class BoatRace {
 		if (playerCount == 0) {
 			if (currentState != RaceState.WAITING) {
 				onRaceFinished(false);
+				allowQueueIn();
 			}
 			waitCountdown = MINIMUM_PLAYERS_COUNTDOWN;
 		}
@@ -195,7 +226,7 @@ public class BoatRace {
 				forAllRacingPlayers(this, (Player player) -> {
 					player.playSound(player, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1f, 0f);
 					if (Math.ceil(startingCountdown) != 0) {
-						plugin.info(player, "Starting in "+((int)Math.ceil(startingCountdown))+"...");
+						plugin.info(player, "Begin racing in "+((int)Math.ceil(startingCountdown))+"...");
 					}
 				});
 			}
@@ -297,7 +328,7 @@ public class BoatRace {
 							if (currentState != RaceState.RACING) {
 								cancel();
 							}
-							if (count >= timeRemaining - time) {
+							if (count == timeRemaining - time) {
 								if (currentState == RaceState.RACING) {
 									forAllRacingPlayers(BoatRace.this, (Player player) -> {
 										player.playSound(player, Sound.BLOCK_NOTE_BLOCK_PLING, 1f, .5f);
@@ -344,6 +375,39 @@ public class BoatRace {
 	      source.getZ() <= Math.max(bound1.getZ(), bound2.getZ()); 
 	}
 	
+	public void joinQueue(Player player) {
+		// Players should only be allowed to join if the game is in the WAITING state
+		if (currentState == RaceState.WAITING) {
+			throw new AssertionError("Development issue. Players should not be able to join the game in the "+currentState+" state.");
+		}
+		queuedPlayers.add(player);
+		
+		player.teleport(getWaitingLocation());
+		player.getInventory().clear();
+		player.setInvulnerable(true);
+		player.setHealth(20);
+		player.setSaturation(20);
+		player.setFoodLevel(20);
+		player.setExp(0);
+		player.setLevel(0);
+		player.setGameMode(GameMode.ADVENTURE);
+	}
+
+	public void leaveQueue(Player player) {
+		queuedPlayers.remove(player);	
+
+		removeFromRacetrack(player);
+		player.setGameMode(GameMode.ADVENTURE);
+		player.getInventory().clear();
+		player.teleport(getLobbyLocation());
+		player.setHealth(20);
+		player.setSaturation(20);
+		player.setFoodLevel(20);
+		player.setInvulnerable(false);
+		player.setExp(0);
+		player.setLevel(0);
+	}
+
 	public void joinRace(Player player) {
 		// Players should only be allowed to join if the game is in the WAITING state
 		if (currentState != RaceState.WAITING) {
@@ -358,7 +422,7 @@ public class BoatRace {
 		player.setSaturation(20);
 		player.setFoodLevel(20);
 		player.setInvulnerable(true);
-		setBoatSelectorItem(player);
+		setSelectorItems(player);
 		setLeaveItem(player);
 		setFastStartItem(player);
 		
@@ -399,6 +463,7 @@ public class BoatRace {
 			player.sendMessage(ChatColor.RED + "The race has been forcefully stopped. Please wait a moment to race again.");
 		});
 		onRaceFinished(false);
+		kickAllFromQueue();
 	}
 	
 	public void onRaceStarting() {
@@ -406,31 +471,8 @@ public class BoatRace {
 		startingCountdown = STARTING_COUNTDOWN_TIME;
 		
 		final ArrayList<Boat> playerBoats = new ArrayList<>();
-		forAllRacingPlayers(this, (Player player) -> {
-			player.teleport(getStartingLocation());
-			player.getInventory().clear();
-			setLeaveItem(player);
-			setHornItem(player);
-			
-			boolean chestBoat = plugin.getPlayerData(player).preferChestBoat();
-			
-			Boat playerBoat;
-			if (chestBoat) {
-				playerBoat = player.getWorld().spawn(getStartingLocation(), ChestBoat.class);
-			} else {
-				playerBoat = player.getWorld().spawn(getStartingLocation(), Boat.class);
-			}
-			
-			Type type = plugin.getPlayerData(player).getBoatType();
-			playerBoat.setBoatType(type);
-			playerBoat.addPassenger(player);
-			playerBoat.setInvulnerable(true);
-			playerBoats.add(playerBoat);
-			
-			player.playSound(player, Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1f);
-		});
 		
-		int radius = 4;
+		int radius = 6;
 		Vector starting = config.startingPosition;
 		World world = plugin.getServer().getWorld(config.world);
 		// Set the air area around the boat to air
@@ -447,11 +489,44 @@ public class BoatRace {
 				}
 			}
 		}
+
+		forAllRacingPlayers(this, (Player player) -> {
+			Location loc = getStartingLocation();
+			
+			// spread players out 3 blocks from the center
+			int radiusSpread = radius - 2;
+
+			double spreadX = (Math.random() - 0.5) * 2 * radiusSpread;
+			double spreadZ = (Math.random() - 0.5) * 2 * radiusSpread;
+
+			loc.setX(loc.getX() + spreadX);
+			loc.setZ(loc.getZ() + spreadZ);
+			player.teleport(loc);
+			player.getInventory().clear();
+			setLeaveItem(player);
+			setHornItem(player);
+			
+			boolean chestBoat = plugin.getPlayerData(player).preferChestBoat();
+			
+			Boat playerBoat;
+			if (chestBoat) {
+				playerBoat = player.getWorld().spawn(loc, ChestBoat.class);
+			} else {
+				playerBoat = player.getWorld().spawn(loc, Boat.class);
+			}
+			
+			Type type = plugin.getPlayerData(player).getBoatType();
+			playerBoat.setBoatType(type);
+			playerBoat.addPassenger(player);
+			playerBoat.setInvulnerable(true);
+			playerBoats.add(playerBoat);
+			
+			player.playSound(player, Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1f);
+		});
 		
 		BukkitRunnable runnable = new BukkitRunnable() {
 			@Override
 			public void run() {
-				// Set the barrier area to air
 				Vector starting = config.startingPosition;
 				World world = plugin.getServer().getWorld(config.world);
 				int tx = (int) starting.getX();
@@ -519,6 +594,7 @@ public class BoatRace {
 		BukkitScheduler scheduler = plugin.getServer().getScheduler();
 		scheduler.scheduleSyncDelayedTask(plugin, () -> {
 			onRaceFinished(true);
+			allowQueueIn();
 		}, 20 * TIME_IN_ENDING);
 		
 		grantPlayersXP();
@@ -540,7 +616,9 @@ public class BoatRace {
 		}
 		removeBlocksOnReset.clear();
 		
-		if (!rejoinPlayers) return;
+		if (!rejoinPlayers) {
+			return;
+		}
 		for (Player p : playersRemaining) {
 			joinRace(p);
 		}
@@ -688,15 +766,24 @@ public class BoatRace {
 		return new Location(lobbyWorld, config.lobbyPosition.getX(), config.lobbyPosition.getY(), config.lobbyPosition.getZ());
 	}
 	
-	public void setBoatSelectorItem(Player player) {
-		//Type boatType = plugin.getPlayerData(player).getBoatType();
-		//Material m = boatType.getMaterial();
-		//Material m = boatTypeList.getOrDefault(player, Type.OAK).getMaterial();
+	public void setSelectorItems(Player player) {
+		ItemStack particleSelector = new ItemStack(Material.FIREWORK_STAR, 1);
+		ItemMeta meta = particleSelector.getItemMeta();
+		meta.setDisplayName(BoatRace.PARTICLE_SELECTOR_NAME);
+		particleSelector.setItemMeta(meta);
+		player.getInventory().setItem(3, particleSelector);
+
 		ItemStack boatSelector = new ItemStack(Material.CLOCK, 1);
-		ItemMeta meta = boatSelector.getItemMeta();
+		meta = boatSelector.getItemMeta();
 		meta.setDisplayName(BoatRace.BOAT_SELECTOR_NAME);
 		boatSelector.setItemMeta(meta);
 		player.getInventory().setItem(4, boatSelector);
+
+		ItemStack hornSelector = new ItemStack(Material.SUNFLOWER, 1);
+		meta = hornSelector.getItemMeta();
+		meta.setDisplayName(BoatRace.HORN_SELECTOR_NAME);
+		hornSelector.setItemMeta(meta);
+		player.getInventory().setItem(5, hornSelector);
 	}
 	
 	public void setLeaveItem(Player player) {
@@ -731,16 +818,20 @@ public class BoatRace {
 			// If there ARE other players, multiply xp by 2 if first, 1.5 if second, 1.25 if third
 			float multiplier = 1;
 			int place = placeList.indexOf(player)+1;
-			if (players.size() == 1) {
+			int totalPlayers = players.size();
+			if (totalPlayers == 1) {
 				multiplier = .75f;
 			} else {
 				if (place == 1) multiplier = 2;
 				if (place == 2) multiplier = 1.5f;
 				if (place == 3) multiplier = 1.25f;
+				if (totalPlayers == 2 && place == 1) multiplier = 1.5f;
+				if (totalPlayers == 2 && place == 2) multiplier = 1.25f;
 				if (place == 0) multiplier = .75f; 
 			}
 			int ticks = bestLaps.getOrDefault(player, 0);
 			float lapMinutes = config.laps * ticks / (20f * 60f);
+			lapMinutes = Math.min(lapMinutes, config.laps * 1.5f);
 			long xp = (long) Math.ceil(30 * lapMinutes);
 			long previousXP = plugin.getPlayerData(player).getXP();
 			
@@ -755,7 +846,7 @@ public class BoatRace {
 				multiplierString = "";
 				xp *= multiplier;
 			}
-			message += ChatColor.RESET+" + "+ChatColor.AQUA+xp+""+multiplierString+ChatColor.WHITE+" XP";
+			message += ChatColor.RESET+" + "+ChatColor.WHITE+xp+""+multiplierString+ChatColor.WHITE+" XP";
 			message += " \n";
 			if (leveledUp) {
 				message += ChatColor.RESET+" - "+ChatColor.YELLOW+ChatColor.BOLD+"LEVELED UP! "+ChatColor.RED+ChatColor.AQUA+"["+previousLevel+" -> "+currentLevel+"]\n";

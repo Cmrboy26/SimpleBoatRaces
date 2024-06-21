@@ -33,6 +33,15 @@ public class RaceManager {
 		}
 		return null;
 	}
+
+	public BoatRace getQueuedRace(Player player) {
+		for (BoatRace race : races.values()) {
+			if (race.queuedPlayers.contains(player)) {
+				return race;
+			}
+		}
+		return null;
+	}
 	
 	public void loadRaces() {
 		unloadRaces();
