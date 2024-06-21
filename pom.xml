@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>net.cmr.simpleboatraces</groupId>
   <artifactId>SimpleBoatRaces</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.0.1</version>
   <build>
       <plugins>
           <plugin>

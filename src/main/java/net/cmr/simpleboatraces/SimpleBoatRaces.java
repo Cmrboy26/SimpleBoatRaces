@@ -15,6 +15,7 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.block.Block;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -49,8 +50,8 @@ import net.cmr.simpleboatraces.BoatRace.BoatRaceConfiguration;
 import net.cmr.simpleboatraces.BoatRace.RaceState;
 import net.cmr.simpleboatraces.PlayerData.HonkSound;
 import net.cmr.simpleboatraces.PlayerData.TrailEffect;
-import net.cmr.simpleboatraces.ui.HornSelectorGUI;
 import net.cmr.simpleboatraces.ui.BoatSelectorGUI;
+import net.cmr.simpleboatraces.ui.HornSelectorGUI;
 import net.cmr.simpleboatraces.ui.TrailSelectorGUI;
 import net.md_5.bungee.api.ChatColor;
 
@@ -419,6 +420,14 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener {
 	    
 	    BoatRace race = manager.getPlayerRace(p);
 	    if (race != null) {
+			if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
+				Block clickedBlock = event.getClickedBlock();
+				Material type = clickedBlock.getType();
+				if (type.isInteractable()) {
+					event.setCancelled(true);
+				}
+			}
+
 	    	ItemStack held = p.getInventory().getItemInMainHand();
 	    	if (held.hasItemMeta()) {
 	    		String name = held.getItemMeta().getDisplayName();
