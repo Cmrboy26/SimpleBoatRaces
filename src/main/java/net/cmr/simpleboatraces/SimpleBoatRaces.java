@@ -46,6 +46,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import net.cmr.lobbylib.LobbyJoinableMinigame;
 import net.cmr.simpleboatraces.BoatRace.BoatRaceConfiguration;
 import net.cmr.simpleboatraces.BoatRace.RaceState;
 import net.cmr.simpleboatraces.PlayerData.HonkSound;
@@ -55,11 +56,13 @@ import net.cmr.simpleboatraces.ui.HornSelectorGUI;
 import net.cmr.simpleboatraces.ui.TrailSelectorGUI;
 import net.md_5.bungee.api.ChatColor;
 
-public final class SimpleBoatRaces extends JavaPlugin implements Listener {
+public final class SimpleBoatRaces extends JavaPlugin implements Listener, LobbyJoinableMinigame {
 
 	// TODO: Add a way to ensure that two or more minigame plugins don't conflict with each other
 	// Maybe store commands in the config that should be run when a player joins an activity
 	// Probably make a lobby plugin that handles all of this. Make each minigame plugin extend a minigame class that has the methods needed to accomplish this
+
+	// TODO: Include rotation and yaw into starting position
 
 	static {
         ConfigurationSerialization.registerClass(BoatRaceConfiguration.class);
@@ -482,6 +485,73 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener {
 			return;
 		}
 		p.getWorld().playSound(p, sound, 2, pitch);
+	}
+
+	@Override
+	public String getMinigameName() {
+		return "SimpleBoatRaces";
+	}
+
+	@Override
+	public boolean isPlayerInMinigame(Player arg0) {
+		return manager.getPlayerRace(arg0) != null || manager.getQueuedRace(arg0) != null; 
+	}
+
+	@Override
+	public void kickPlayerFromMinigame(Player arg0) {
+		BoatRace race = manager.getPlayerRace(arg0);
+		if (race != null) {
+			race.leaveRace(arg0, true);
+			return;
+		}
+		race = manager.getQueuedRace(arg0);
+		if (race != null) {
+			race.leaveQueue(arg0);
+		}
+	}
+
+	@Override
+	public String getMinigameDescription() {
+		return "Compete with others to get the first place on ice boat tracks!";
+	}
+
+	@Override
+	public Material getMinigameIcon() {
+		return Material.BAMBOO_RAFT;
+	}
+
+	@Override
+	public void joinMinigame(Player arg0) {
+		// Find a random match to join (prefer ones with the most people)
+		BoatRace highestPlayerRace = null;
+		int highestPlayerCount = -1;
+		BoatRace largestQueueRace = null;
+		int largestQueuePlayerCount = -1;
+		for (BoatRace race : manager.getRaces().values()) {
+			int players = race.players.size();
+			boolean joinable = race.canJoinRace(arg0);
+			if (joinable && players > highestPlayerCount) {
+				highestPlayerCount = players;
+				highestPlayerRace = race;
+			}
+			if (!joinable) {
+				if (players > largestQueuePlayerCount) {
+					largestQueuePlayerCount = players;
+					largestQueueRace = race;
+				}
+			}
+		}
+		if (highestPlayerRace != null) {
+			highestPlayerRace.joinRace(arg0);
+			return;
+		}
+		// If there is not a playable race, find a race with the most amount of players with a queue
+		if (largestQueueRace != null) {
+			largestQueueRace.joinQueue(arg0);
+			return;
+		}
+		// Both should not be null ever (unless there are no tracks)
+		arg0.sendMessage(ChatColor.RED+"There are no available tracks to join. Please try again later.");
 	}
 	
 }
