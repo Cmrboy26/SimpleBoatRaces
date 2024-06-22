@@ -120,14 +120,15 @@ public class BoatRace {
 	/**
 	 * If the game is running, do not allow the player to join the game.
 	 * Will also check if the player has the proper permissions to join the race, which
-	 * can be modified by overriding hasPermissionToJoinRace()
+	 * can be modified by overriding hasPermissionToJoinRace().
+	 * If the track cannot be played, as specified by isRacePlayable(), the player will not be able to join.
 	 */
 	public boolean canJoinRace(Player player) {
-		return hasPermissionToJoinRace(player) && currentState == RaceState.WAITING;
+		return hasPermissionToJoinRace(player) && currentState == RaceState.WAITING && isRacePlayable();
 	}
 
 	public boolean canQueueRace(Player player) {
-		return hasPermissionToJoinRace(player) && currentState != RaceState.WAITING;
+		return hasPermissionToJoinRace(player) && currentState != RaceState.WAITING && isRacePlayable();
 	}
 	
 	/**
@@ -142,9 +143,11 @@ public class BoatRace {
 	 * If the worlds are not correctly set, it will return false.
 	 */
 	public boolean isRacePlayable() {
-		World world = plugin.getServer().getWorld(config.world);
-		World lobbyWorld = plugin.getServer().getWorld(config.lobbyWorld);
-		return world != null && lobbyWorld != null && updateMethodTaskID != -1;
+		Location start = getStartingLocation();
+		Location wait = getWaitingLocation();
+		Location lobby = getLobbyLocation();
+
+		return start != null && wait != null && lobby != null;
 	}
 
 	public void allowQueueIn() {
@@ -380,6 +383,9 @@ public class BoatRace {
 		if (currentState == RaceState.WAITING) {
 			throw new AssertionError("Development issue. Players should not be able to join the game in the "+currentState+" state.");
 		}
+
+		plugin.onPlayerJoinMinigame(player);
+
 		queuedPlayers.add(player);
 		
 		player.teleport(getWaitingLocation());
@@ -406,6 +412,8 @@ public class BoatRace {
 		player.setInvulnerable(false);
 		player.setExp(0);
 		player.setLevel(0);
+
+		plugin.onPlayerLeaveMinigame(player);
 	}
 
 	public void joinRace(Player player) {
@@ -413,6 +421,8 @@ public class BoatRace {
 		if (currentState != RaceState.WAITING) {
 			throw new AssertionError("Development issue. Players should not be able to join the game in the "+currentState+" state.");
 		}
+
+		plugin.onPlayerJoinMinigame(player);
 		
 		players.add(player);
 		player.setGameMode(GameMode.ADVENTURE);
@@ -455,6 +465,8 @@ public class BoatRace {
 			laps.remove(player);
 			checkpointPlayers.remove(player);
 		}
+
+		plugin.onPlayerLeaveMinigame(player);
 	}
 	
 	public void forceStop() {
@@ -473,8 +485,7 @@ public class BoatRace {
 		final ArrayList<Boat> playerBoats = new ArrayList<>();
 		
 		int radius = 6;
-		Vector starting = config.startingPosition;
-		World world = plugin.getServer().getWorld(config.world);
+		Location starting = getStartingLocation();
 		// Set the air area around the boat to air
 		int tx = (int) starting.getX();
 		int ty = (int) starting.getY();
@@ -482,7 +493,7 @@ public class BoatRace {
 		for (int x = tx-radius; x < tx+radius; x++) {
 			for (int y = ty-1; y < ty+1; y++) {
 				for (int z = tz-radius; z < tz+radius; z++) {
-					Block at = world.getBlockAt(x, y, z);
+					Block at = starting.getWorld().getBlockAt(x, y, z);
 					if (at.isEmpty()) {
 						at.setType(Material.BARRIER);
 					}
@@ -527,15 +538,14 @@ public class BoatRace {
 		BukkitRunnable runnable = new BukkitRunnable() {
 			@Override
 			public void run() {
-				Vector starting = config.startingPosition;
-				World world = plugin.getServer().getWorld(config.world);
+				Location starting = getStartingLocation();
 				int tx = (int) starting.getX();
 				int ty = (int) starting.getY();
 				int tz = (int) starting.getZ();
 				for (int x = tx-radius; x < tx+radius; x++) {
 					for (int y = ty-1; y < ty+1; y++) {
 						for (int z = tz-radius; z < tz+radius; z++) {
-							Block at = world.getBlockAt(x, y, z);
+							Block at = starting.getWorld().getBlockAt(x, y, z);
 							if (at.getType() == Material.BARRIER) {
 								at.setType(Material.AIR);
 							}
@@ -745,25 +755,28 @@ public class BoatRace {
 	}
 	
 	public World getRaceWorld() {
-		return plugin.getServer().getWorld(config.world);
+		return getStartingLocation().getWorld();
 	}
 	
 	public Location getWaitingLocation() {
-		World world = plugin.getServer().getWorld(config.world);
-		// We can assume that the world is not null because it would not allow anyone to join the race if it was (checked in isRacePlayable)
-		return new Location(world, config.waitPosition.getX(), config.waitPosition.getY(), config.waitPosition.getZ());
+		if (config.waitPosition == null) {
+			return null;
+		}
+		return config.waitPosition.clone();
 	}
 	
 	public Location getStartingLocation() {
-		World world = plugin.getServer().getWorld(config.world);
-		// We can assume that the world is not null because it would not allow anyone to join the race if it was (checked in isRacePlayable)
-		return new Location(world, config.startingPosition.getX(), config.startingPosition.getY(), config.startingPosition.getZ());
+		if (config.startingPosition == null) {
+			return null;
+		}
+		return config.startingPosition.clone();
 	}
 	
 	public Location getLobbyLocation() {
-		World lobbyWorld = plugin.getServer().getWorld(config.lobbyWorld);
-		// We can assume that the world is not null because it would not allow anyone to join the race if it was (checked in isRacePlayable)
-		return new Location(lobbyWorld, config.lobbyPosition.getX(), config.lobbyPosition.getY(), config.lobbyPosition.getZ());
+		if (config.lobbyPosition == null) {
+			return null;
+		}
+		return config.lobbyPosition.clone();
 	}
 	
 	public void setSelectorItems(Player player) {
@@ -833,7 +846,6 @@ public class BoatRace {
 			float lapMinutes = config.laps * ticks / (20f * 60f);
 			lapMinutes = Math.min(lapMinutes, config.laps * 1.5f);
 			long xp = (long) Math.ceil(30 * lapMinutes);
-			long previousXP = plugin.getPlayerData(player).getXP();
 			
 			long previousLevel = plugin.getPlayerData(player).getLevel();
 			boolean leveledUp = plugin.getPlayerData(player).addXP((long) Math.ceil(xp * multiplier));
@@ -868,26 +880,18 @@ public class BoatRace {
 		
 		public Vector finishLinePos1, finishLinePos2;
 		public Vector checkPointPos1, checkPointPos2;
-		public Vector waitPosition, startingPosition, endPosition, lobbyPosition;
-		public String world, lobbyWorld;
+		public Location waitPosition, startingPosition, lobbyPosition;
 		public int maxPlayers, recommendedPlayers, minPlayers, laps;
-		
-		// TODO: Have the creator place down boats that they want the course to start with
-		// Check in an area around the player for boats, set the max players to the number of those boats,
-		// and then store a list of the boat positions to spawn the players in.
 		
 		public BoatRaceConfiguration() {
 			finishLinePos1 = new Vector();
 			finishLinePos2 = new Vector();
 			checkPointPos1 = new Vector();
 			checkPointPos2 = new Vector();
-			waitPosition = new Vector();
-			startingPosition = new Vector();
-			endPosition = new Vector();
-			lobbyPosition = new Vector();
-			world = "world";
-			lobbyWorld = "world";
-			maxPlayers = 6;
+			waitPosition = null;
+			startingPosition = null;
+			lobbyPosition = null;
+			maxPlayers = 8;
 			minPlayers = 1;
 			laps = 3;
 		}
@@ -897,12 +901,13 @@ public class BoatRace {
 			finishLinePos2 = (Vector) map.get("finishLinePos2");
 			checkPointPos1 = (Vector) map.get("checkPointPos1");
 			checkPointPos2 = (Vector) map.get("checkPointPos2");
-			waitPosition = (Vector) map.get("waitPosition");
-			startingPosition = (Vector) map.get("startingPosition");
-			endPosition = (Vector) map.get("endPosition");
-			lobbyPosition = (Vector) map.get("lobbyPosition");
-			world = (String) map.get("world");
-			lobbyWorld = (String) map.get("lobbyWorld");
+			try {
+				waitPosition = (Location) map.get("waitPosition");
+				startingPosition = (Location) map.get("startingPosition");
+				lobbyPosition = (Location) map.get("lobbyPosition");
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 			maxPlayers = (Integer) map.getOrDefault("maxPlayers", 6);
 			minPlayers = (Integer) map.getOrDefault("minPlayers", 1);
 			laps = (Integer) map.getOrDefault("laps", 3);
@@ -911,13 +916,10 @@ public class BoatRace {
 		@Override
 		public Map<String, Object> serialize() {
 			Map<String, Object> map = new HashMap<>();
-			map.put("world", world);
-			map.put("lobbyWorld", lobbyWorld);
 			map.put("maxPlayers", maxPlayers);
 			map.put("minPlayers", minPlayers);
 			map.put("waitPosition", waitPosition);
 			map.put("startingPosition", startingPosition);
-			map.put("endPosition", endPosition);
 			map.put("lobbyPosition", lobbyPosition);
 			map.put("finishLinePos1", finishLinePos1);
 			map.put("finishLinePos2", finishLinePos2);

@@ -2,8 +2,11 @@ package net.cmr.simpleboatraces;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
@@ -11,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -54,15 +58,8 @@ import net.cmr.simpleboatraces.PlayerData.TrailEffect;
 import net.cmr.simpleboatraces.ui.BoatSelectorGUI;
 import net.cmr.simpleboatraces.ui.HornSelectorGUI;
 import net.cmr.simpleboatraces.ui.TrailSelectorGUI;
-import net.md_5.bungee.api.ChatColor;
 
 public final class SimpleBoatRaces extends JavaPlugin implements Listener, LobbyJoinableMinigame {
-
-	// TODO: Add a way to ensure that two or more minigame plugins don't conflict with each other
-	// Maybe store commands in the config that should be run when a player joins an activity
-	// Probably make a lobby plugin that handles all of this. Make each minigame plugin extend a minigame class that has the methods needed to accomplish this
-
-	// TODO: Include rotation and yaw into starting position
 
 	static {
         ConfigurationSerialization.registerClass(BoatRaceConfiguration.class);
@@ -246,9 +243,13 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 	
 	@EventHandler
 	public void onPlayerLeave(PlayerQuitEvent event) {
-		BoatRace race = manager.getPlayerRace(event.getPlayer());
+		BoatRace race = manager.getParticipatingRace(event.getPlayer());
 		if (race != null) {
 			race.leaveRace(event.getPlayer(), true);
+		}
+		BoatRace queuedRace = manager.getQueuedRace(event.getPlayer());
+		if (queuedRace != null) {
+			queuedRace.leaveQueue(event.getPlayer());
 		}
 		removePlayerData(event.getPlayer());
 	}
@@ -260,8 +261,7 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 			return;
 		}
 		Player player = (Player) exitedEntity;
-		BoatRace race = manager.getPlayerRace(player);
-		if (race != null) {
+		if (isPlayerInMinigame(player)) {
 			event.setCancelled(true);
 		}
 	}
@@ -273,8 +273,8 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 			return;
 		}
 		Player player = (Player) exitedEntity;
-		BoatRace race = manager.getPlayerRace(player);
-		if (race != null) {
+		boolean playerInRace = isPlayerInMinigame(player);
+		if (playerInRace) {
 			Vehicle vehicle = event.getVehicle();
 			// Don't let people get into a boat with other people
 			if (vehicle.getPassengers().size() >= 1) {
@@ -286,17 +286,16 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 	
 	@EventHandler
 	public void onVehicleDestroy(VehicleDestroyEvent event) {
-		event.setCancelled(true);
 		if (event.getAttacker() instanceof Player) {
 			Player attacker = (Player) event.getAttacker();
-			if (attacker.getGameMode() == GameMode.CREATIVE) {
-				event.setCancelled(false);
+			if (isPlayerInMinigame(attacker) && attacker.getGameMode() != GameMode.CREATIVE) {
+				event.setCancelled(true);
 			}
 		}
 	}
 	
 	public boolean isInRace(Player player) {
-		return manager.getPlayerRace(player) != null;
+		return manager.getParticipatingRace(player) != null;
 	}
 	
 	@EventHandler
@@ -310,22 +309,24 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 	public void onPlayerInventoryEvent(InventoryClickEvent event) {
 		if (!(event.getWhoClicked() instanceof Player)) return;
 		Player player = (Player) event.getWhoClicked();
-	    BoatRace race = manager.getPlayerRace(player);
-	    if (race != null) {
-	    	event.setCancelled(true);
-	    }
+		boolean isInMinigame = isPlayerInMinigame(player);
+		if (isInMinigame) {
+			event.setCancelled(true);
+		}
 	}
 	
 	@EventHandler
 	public void onPlayerFillBucket(PlayerBucketFillEvent event) {
-		event.setCancelled(isInRace(event.getPlayer()));
+		if (isPlayerInMinigame(event.getPlayer())) {
+			event.setCancelled(true);
+		}
 	}
 	
 	@EventHandler
 	public void onPlayerPlace(BlockPlaceEvent e) {
-		BoatRace race = manager.getPlayerRace(e.getPlayer());
-	    if (race != null) {
-	    	getLogger().info(e.getItemInHand().toString());
+		BoatRace race = manager.getJoinedRace(e.getPlayer());
+		boolean playerIsInRace = isPlayerInMinigame(e.getPlayer());
+	    if (playerIsInRace) {
 	    	if (e.getItemInHand().hasItemMeta()) {
 	    		String name = e.getItemInHand().getItemMeta().getDisplayName();
 	    		if (name.equals(BoatRace.HORN_NAME)) {
@@ -348,6 +349,7 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 	    			return;
 	    		}
 	    	}
+			if (race == null) return;
 	    	if (race.currentState == RaceState.RACING) {
 	    		if (e.getBlockReplacedState().getType() == Material.AIR) {
 		    		race.removeBlocksOnReset.add(e.getBlock().getLocation().toVector());
@@ -367,7 +369,7 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 		for (Entity passenger : move.getVehicle().getPassengers()) {
 			if (passenger instanceof Player) {
 				Player player = (Player) passenger;
-				BoatRace race = manager.getPlayerRace(player);
+				BoatRace race = manager.getJoinedRace(player);
 				if (race != null) {
 					TrailEffect effect = getPlayerData(player).getTrailEffect();
 					if (effect == null || effect.effect == null) {
@@ -396,18 +398,16 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 
 	@EventHandler
 	public void onPlayerBreak(BlockBreakEvent e) {
-		BoatRace race = manager.getPlayerRace(e.getPlayer());
-	    if (race != null) {
-	    	e.setCancelled(true);
-	    }
+		if (isPlayerInMinigame(e.getPlayer())) {
+			e.setCancelled(true);
+		}
 	}
 	
 	@EventHandler
 	public void onPlayerDrop(PlayerDropItemEvent e) {
-		BoatRace race = manager.getPlayerRace(e.getPlayer());
-	    if (race != null) {
-	    	e.setCancelled(true);
-	    }
+		if (isPlayerInMinigame(e.getPlayer())) {
+			e.setCancelled(true);
+		}
 	}
 	
 	@EventHandler()
@@ -421,8 +421,9 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 	    	return;
 	    }
 	    
-	    BoatRace race = manager.getPlayerRace(p);
-	    if (race != null) {
+	    BoatRace race = manager.getJoinedRace(p);
+		boolean playerInRace = isPlayerInMinigame(p);
+	    if (playerInRace) {
 			if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
 				Block clickedBlock = event.getClickedBlock();
 				Material type = clickedBlock.getType();
@@ -432,7 +433,7 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 			}
 
 	    	ItemStack held = p.getInventory().getItemInMainHand();
-	    	if (held.hasItemMeta()) {
+	    	if (held.hasItemMeta() && race != null) {
 	    		String name = held.getItemMeta().getDisplayName();
 	    		if (name.contains(BoatRace.PARTICLE_SELECTOR_NAME)) {
 					TrailSelectorGUI gui = new TrailSelectorGUI(this, p);
@@ -489,17 +490,22 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 
 	@Override
 	public String getMinigameName() {
-		return "SimpleBoatRaces";
+		return "Boat Racing";
+	}
+
+	@Override
+	public ChatColor[] getMinigameTitleColor() {
+		return new ChatColor[] {ChatColor.AQUA, ChatColor.BOLD};
 	}
 
 	@Override
 	public boolean isPlayerInMinigame(Player arg0) {
-		return manager.getPlayerRace(arg0) != null || manager.getQueuedRace(arg0) != null; 
+		return manager != null && manager.getJoinedRace(arg0) != null;
 	}
 
 	@Override
 	public void kickPlayerFromMinigame(Player arg0) {
-		BoatRace race = manager.getPlayerRace(arg0);
+		BoatRace race = manager.getParticipatingRace(arg0);
 		if (race != null) {
 			race.leaveRace(arg0, true);
 			return;
@@ -528,6 +534,10 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 		BoatRace largestQueueRace = null;
 		int largestQueuePlayerCount = -1;
 		for (BoatRace race : manager.getRaces().values()) {
+			if (!race.isRacePlayable()) {
+				continue;
+			}
+
 			int players = race.players.size();
 			boolean joinable = race.canJoinRace(arg0);
 			if (joinable && players > highestPlayerCount) {
@@ -535,12 +545,24 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 				highestPlayerRace = race;
 			}
 			if (!joinable) {
-				if (players > largestQueuePlayerCount) {
+				if (race.canQueueRace(arg0) && players > largestQueuePlayerCount) {
 					largestQueuePlayerCount = players;
 					largestQueueRace = race;
 				}
 			}
 		}
+		if (largestQueuePlayerCount == 0 && highestPlayerCount == 0) {
+			// There is no one playing or queued, join a random track.
+			List<BoatRace> races = new ArrayList<>(manager.getRaces().values());
+			Collections.shuffle(races);
+			for (BoatRace race : races) {
+				if (race.canJoinRace(arg0)) {
+					race.joinRace(arg0);
+					return;
+				}
+			}
+		}
+
 		if (highestPlayerRace != null) {
 			highestPlayerRace.joinRace(arg0);
 			return;
@@ -550,7 +572,7 @@ public final class SimpleBoatRaces extends JavaPlugin implements Listener, Lobby
 			largestQueueRace.joinQueue(arg0);
 			return;
 		}
-		// Both should not be null ever (unless there are no tracks)
+		// Both should not be null ever (unless there are no tracks available)
 		arg0.sendMessage(ChatColor.RED+"There are no available tracks to join. Please try again later.");
 	}
 	

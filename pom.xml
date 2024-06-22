@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>net.cmr.simpleboatraces</groupId>
   <artifactId>SimpleBoatRaces</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   <build>
       <plugins>
           <plugin>
@@ -36,7 +36,7 @@
        <dependency>
             <groupId>com.github.Cmrboy26</groupId>
 	        <artifactId>lobbylib</artifactId>
-	        <version>latest</version>
+	        <version>0.0.4</version>
         </dependency>
    </dependencies>
 </project>

@@ -25,7 +25,18 @@ public class RaceManager {
 		return races;
 	}
 	
-	public BoatRace getPlayerRace(Player player) {
+	public BoatRace getJoinedRace(Player player) {
+		BoatRace participatingRace = getParticipatingRace(player);
+		BoatRace queuedRace = getQueuedRace(player);
+		if (participatingRace != null) {
+			return participatingRace;
+		} else if (queuedRace != null) {
+			return queuedRace;
+		}
+		return null;
+	}
+
+	public BoatRace getParticipatingRace(Player player) {
 		for (BoatRace race : races.values()) {
 			if (race.players.contains(player)) {
 				return race;

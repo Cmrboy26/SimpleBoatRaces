@@ -17,7 +17,6 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Boat;
 import org.bukkit.entity.Player;
-import org.bukkit.util.Vector;
 
 import net.cmr.simpleboatraces.BoatRace.BoatRaceConfiguration;
 import net.cmr.simpleboatraces.BoatRace.RaceState;
@@ -107,7 +106,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 			
 			plugin.info(sender, "Joining race \""+mapName+"\"...");
 			
-			BoatRace currentRace = plugin.manager.getPlayerRace(player);
+			BoatRace currentRace = plugin.manager.getParticipatingRace(player);
 			if (currentRace != null && !currentRace.equals(race)) {
 				// If the player is in another race already, kick them from that race.
 				currentRace.leaveRace(player, false);
@@ -121,7 +120,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 				return true;
 			}
 			
-			BoatRace currentRace = plugin.manager.getPlayerRace(player);
+			BoatRace currentRace = plugin.manager.getParticipatingRace(player);
 			if (currentRace != null) {
 				currentRace.leaveRace(player, true);
 				plugin.info(sender, "Leaving race...");
@@ -143,7 +142,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 			}
 			if (args.length == 1) {
 				// Try stopping the current race the player is in
-				BoatRace currentRace = plugin.manager.getPlayerRace(player);
+				BoatRace currentRace = plugin.manager.getParticipatingRace(player);
 				if (currentRace != null) {
 					plugin.info(sender, "Force stopping the race...");
 					currentRace.forceStop();
@@ -171,7 +170,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 			}
 			if (args.length == 1) {
 				// Try stopping the current race the player is in
-				BoatRace currentRace = plugin.manager.getPlayerRace(player);
+				BoatRace currentRace = plugin.manager.getParticipatingRace(player);
 				if (currentRace != null) {
 					if (currentRace.currentState == RaceState.WAITING) {
 						plugin.info(sender, "Force starting the race...");
@@ -195,7 +194,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 			}
 			BoatRace race = null;
 			if (args.length <= 1) {
-				race = plugin.manager.getPlayerRace(player);
+				race = plugin.manager.getParticipatingRace(player);
 				if (race == null) {
 					plugin.info(sender, ChatColor.RED + "Not enough arguments. Must be in a race or specify a racetrack.");
 					return true;
@@ -282,15 +281,25 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 				}
 				
 				if (key.toLowerCase().contains("pos")) {
-					// Vector
+					// Location OR vector.
 					Location playerLocation = player.getLocation();
-					Vector pos = playerLocation.toVector();
 					
-					configMap.put(key, pos);
+					if (key.toLowerCase().contains("check") || key.toLowerCase().contains("finish")) {
+						// Vector 
+						configMap.put(key, playerLocation.toVector());
+					} else {
+						// Location
+						configMap.put(key, playerLocation);
+					}
+
 					race.config = new BoatRaceConfiguration(configMap);
 					plugin.manager.updateConfig(race.getName(), race.config);
 					
-					plugin.info(sender, "Successfully set "+key+" to "+pos.toString());
+					double x = playerLocation.getX();
+					double y = playerLocation.getY();
+					double z = playerLocation.getZ();
+
+					plugin.info(sender, "Successfully set "+key+" to ["+x+", "+y+", "+z+"]");
 					return true;
 				}
 				
@@ -325,7 +334,7 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 					return true;
 				}
 				
-				if (key.toLowerCase().contains("laps") || key.toLowerCase().contains("players")) {
+				if (key.toLowerCase().contains("lap") || key.toLowerCase().contains("players")) {
 					// Integer
 					try {
 						Integer readInteger = Integer.parseInt(providedValue);

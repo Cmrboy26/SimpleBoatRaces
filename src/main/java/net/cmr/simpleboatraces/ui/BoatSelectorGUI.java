@@ -72,6 +72,7 @@ public class BoatSelectorGUI extends GUI {
 				if (playerLevel < levelToSelect && !player.hasPermission("cmr.boatraces.unlockall")) {
 					color = ChatColor.RED;
 					setMaterial(BoatSelectorGUI.LOCKED_ITEM_MATERIAL);
+					setName(ChatColor.RED + name + " (Locked)");
 				}
 				
 				String[] lore = {ChatColor.BOLD + "" + color + "Level required: " + ChatColor.RESET + color + levelToSelect};
