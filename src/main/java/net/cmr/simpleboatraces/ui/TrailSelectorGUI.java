@@ -66,9 +66,9 @@ public class TrailSelectorGUI extends GUI {
 			public void updateItemMeta(ItemMeta meta) {
 				TrailEffect currentSound = plugin.getPlayerData(player).getTrailEffect();
 				if (currentSound == effect) {
-					meta.addEnchant(Enchantment.DURABILITY, 1, true);
+					meta.addEnchant(Enchantment.UNBREAKING, 1, true);
 				} else {
-					meta.removeEnchant(Enchantment.DURABILITY);
+					meta.removeEnchant(Enchantment.UNBREAKING);
 				}
 				meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
 			}

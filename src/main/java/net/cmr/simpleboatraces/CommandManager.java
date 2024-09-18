@@ -568,7 +568,11 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 				return end;
 			}
 			if (args.length == 3) {
-				return new ArrayList<>(new BoatRaceConfiguration().serialize().keySet());
+				List<String> keys = new ArrayList<>(new BoatRaceConfiguration().serialize().keySet());
+				keys.removeIf((String string) -> {
+					return string != null && !string.contains(args[2].toLowerCase());
+				});
+				return keys;
 			}
 		default: 
 			return null;

@@ -84,9 +84,9 @@ public class BoatSelectorGUI extends GUI {
 				Boat.Type currentBoatType = plugin.getPlayerData(player).getBoatType();
 				boolean chestBoat = plugin.getPlayerData(player).preferChestBoat();
 				if (currentBoatType == boatType && chestBoat == isChestBoat) {
-					meta.addEnchant(Enchantment.DURABILITY, 1, true);
+					meta.addEnchant(Enchantment.UNBREAKING, 1, true);
 				} else {
-					meta.removeEnchant(Enchantment.DURABILITY);
+					meta.removeEnchant(Enchantment.UNBREAKING);
 				}
 				meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
 			}

@@ -49,11 +49,11 @@ public class BoatRace {
 	int updateMethodTaskID = -1;
 	final String name;
 	
-	final int MINIMUM_PLAYERS_COUNTDOWN = 20;
-	final int DESIRED_PLAYERS_COUNTDOWN = 10;
-	final int TIME_IN_ENDING = 5;
-	final float STARTING_COUNTDOWN_TIME = 3.05f;
-	final int BOAT_RACE_HALFTIME_COUNTDOWN = 30;
+	static int MINIMUM_PLAYERS_COUNTDOWN = 30;
+	static int DESIRED_PLAYERS_COUNTDOWN = 10;
+	static int TIME_IN_ENDING = 5;
+	static int BOAT_RACE_HALFTIME_COUNTDOWN = 30;
+	final static float STARTING_COUNTDOWN_TIME = 3.05f;
 	
 	// Waiting Variables
 	HashSet<Player> queuedPlayers = new HashSet<>();
@@ -484,7 +484,7 @@ public class BoatRace {
 		
 		final ArrayList<Boat> playerBoats = new ArrayList<>();
 		
-		int radius = 6;
+		int radius = 7;
 		Location starting = getStartingLocation();
 		// Set the air area around the boat to air
 		int tx = (int) starting.getX();
@@ -505,7 +505,7 @@ public class BoatRace {
 			Location loc = getStartingLocation();
 			
 			// spread players out 3 blocks from the center
-			int radiusSpread = radius - 2;
+			int radiusSpread = radius - 3;
 
 			double spreadX = (Math.random() - 0.5) * 2 * radiusSpread;
 			double spreadZ = (Math.random() - 0.5) * 2 * radiusSpread;
@@ -594,7 +594,7 @@ public class BoatRace {
 			}
 			subtitle += ChatColor.RESET + " ";
 			subtitle.substring(1);
-			player.sendTitle(title, ChatColor.RESET + subtitle, 0, (int) (TIME_IN_ENDING / 2f) * 20, 10);
+			player.sendTitle(title, ChatColor.RESET + subtitle, 0, (int) (5f) * 20, 10);
 			setLeaveItem(player);
 		});
 		
@@ -918,6 +918,7 @@ public class BoatRace {
 			Map<String, Object> map = new HashMap<>();
 			map.put("maxPlayers", maxPlayers);
 			map.put("minPlayers", minPlayers);
+			map.put("laps", laps);
 			map.put("waitPosition", waitPosition);
 			map.put("startingPosition", startingPosition);
 			map.put("lobbyPosition", lobbyPosition);
