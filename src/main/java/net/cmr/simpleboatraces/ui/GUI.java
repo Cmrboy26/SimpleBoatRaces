@@ -46,7 +46,11 @@ public abstract class GUI {
 			meta.setLore(entry.getLore());
 			entry.updateItemMeta(meta);
 			stack.setItemMeta(meta);
-			inventory.setItem(entry.getSlot(), stack);
+			if (entry.getSlot() < size) {
+				inventory.setItem(entry.getSlot(), stack);
+			} else {
+				throw new RuntimeException("Slot index "+entry.getSlot()+" is too large for inventory of size "+size);
+			}
 		}
 	}
 	

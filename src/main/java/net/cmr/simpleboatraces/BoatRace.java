@@ -517,7 +517,7 @@ public class BoatRace {
 			
 			boolean chestBoat = plugin.getPlayerData(player).preferChestBoat();
 			
-			Boat playerBoat = (Boat) Utils.spawnBoat(player.getWorld(), loc, plugin.getPlayerData(player).toString(), chestBoat);
+			Boat playerBoat = (Boat) Utils.spawnBoat(player.getWorld(), loc, plugin.getPlayerData(player).getBoatType(), chestBoat);
 			
 			playerBoat.addPassenger(player);
 			playerBoat.setInvulnerable(true);

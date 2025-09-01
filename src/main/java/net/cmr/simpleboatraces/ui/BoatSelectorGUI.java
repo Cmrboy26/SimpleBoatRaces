@@ -47,23 +47,29 @@ public class BoatSelectorGUI extends GUI {
 
 		ArrayList<Material> boatTypes = new ArrayList<>();
 		for (Material material : Material.values()) {
-			if (material.name().toUpperCase().contains("BOAT") || material.name().toUpperCase().contains("RAFT")) {
+			if (material.name().toUpperCase().contains("_BOAT") || material.name().toUpperCase().contains("_RAFT")) {
 				boatTypes.add(material);
 			}
 		}
 
-		for (int i = 0; i < boatTypes.size() * 2; i++) {
+		// TODO: sort boats to make leveling better
+		
+		for (int i = 0; i < boatTypes.size(); i++) {
 			int x = 1 + (i % columns);
 			int y = i / columns;
 			int slot = y * 9 + x + 9;
-			boolean isChestBoat = i / boatTypes.size() == 1;
-			int levelsToUnlock = i * LEVEL_UNTIL_UNLOCK_INCREMENT;
+			/*boolean isChestBoat = i / boatTypes.size() == 1;
+			Type type = boatTypes.get(i % boatTypes.size());*/
+
 			String type = boatTypes.get(i % boatTypes.size()).toString();
+			boolean isChestBoat = type.contains("_CHEST");
+			type = type.replaceAll("_CHEST", "").replaceAll("_BOAT", "").replaceAll("_RAFT", "");
+			int levelsToUnlock = i * LEVEL_UNTIL_UNLOCK_INCREMENT;
 			list.add(createBoatEntry(type, isChestBoat, levelsToUnlock, slot, plugin, player));
 		}
 		list.add(new ExitGUIEntry(Material.BARRIER, ChatColor.RED + "Close", 1, 49));
 		list.addAll(getBorderEntries(BoatSelectorGUI.BORDER_ITEM_MATERIAL, plugin, player));
-		
+
 		return list;
 	}
 	
