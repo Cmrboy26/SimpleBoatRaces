@@ -424,13 +424,13 @@ public class CommandManager implements CommandExecutor, TabCompleter {
 			
 			try {
 				PlayerData data = new PlayerData(plugin, uuid);
-				Boat.Type boat = data.getBoatType();
+				String boatType = data.getBoatType();
 				boolean chestBoat = data.preferChestBoat();
 				String message = "" + pname + "'s stats:";
 				message += "\n -"+ChatColor.YELLOW+" Wins: "+ChatColor.WHITE+data.getWins();
 				message += "\n -"+ChatColor.YELLOW+" Level: "+ChatColor.WHITE+data.getLevel();
 				message += "\n -"+ChatColor.YELLOW+" XP to Level Up: "+ChatColor.WHITE+data.getXPToLevelUp();
-				message += "\n -"+ChatColor.YELLOW+" Boat Type: "+ChatColor.WHITE+Utils.capitalizeString(Utils.getBoatItem(boat, chestBoat).name().replaceAll("_", " ").toLowerCase());
+				message += "\n -"+ChatColor.YELLOW+" Boat Type: "+ChatColor.WHITE+Utils.capitalizeString(Utils.getBoatItem(boatType, chestBoat).name().replaceAll("_", " ").toLowerCase());
 				message += "\n -"+ChatColor.YELLOW+" Honk Sound: "+ChatColor.WHITE+data.getHonkSound().name;
 				message += "\n -"+ChatColor.YELLOW+" Trail Effect: "+ChatColor.WHITE+data.getTrailEffect().name;
 				plugin.info(sender, message);

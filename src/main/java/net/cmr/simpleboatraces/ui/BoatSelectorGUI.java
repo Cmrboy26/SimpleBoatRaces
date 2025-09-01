@@ -8,7 +8,6 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Boat;
-import org.bukkit.entity.Boat.Type;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
@@ -45,13 +44,21 @@ public class BoatSelectorGUI extends GUI {
 		List<Entry> list = new ArrayList<>();
 		
 		int columns = 7;
-		for (int i = 0; i < Boat.Type.values().length * 2; i++) {
+
+		ArrayList<Material> boatTypes = new ArrayList<>();
+		for (Material material : Material.values()) {
+			if (material.name().toUpperCase().contains("BOAT") || material.name().toUpperCase().contains("RAFT")) {
+				boatTypes.add(material);
+			}
+		}
+
+		for (int i = 0; i < boatTypes.size() * 2; i++) {
 			int x = 1 + (i % columns);
 			int y = i / columns;
 			int slot = y * 9 + x + 9;
-			boolean isChestBoat = i / Type.values().length == 1;
+			boolean isChestBoat = i / boatTypes.size() == 1;
 			int levelsToUnlock = i * LEVEL_UNTIL_UNLOCK_INCREMENT;
-			Type type = Boat.Type.values()[i % Type.values().length];
+			String type = boatTypes.get(i % boatTypes.size()).toString();
 			list.add(createBoatEntry(type, isChestBoat, levelsToUnlock, slot, plugin, player));
 		}
 		list.add(new ExitGUIEntry(Material.BARRIER, ChatColor.RED + "Close", 1, 49));
@@ -60,7 +67,7 @@ public class BoatSelectorGUI extends GUI {
 		return list;
 	}
 	
-	private static Entry createBoatEntry(Boat.Type boatType, boolean isChestBoat, int levelToSelect, int slot, SimpleBoatRaces plugin, Player player) {
+	private static Entry createBoatEntry(String boatType, boolean isChestBoat, int levelToSelect, int slot, SimpleBoatRaces plugin, Player player) {
 		Material boatItemMaterial = Utils.getBoatItem(boatType, isChestBoat);
 		String name = Utils.capitalizeString(boatItemMaterial.name().toLowerCase().replaceAll("_", " "));
 		
@@ -81,9 +88,9 @@ public class BoatSelectorGUI extends GUI {
 			
 			@Override
 			public void updateItemMeta(ItemMeta meta) {
-				Boat.Type currentBoatType = plugin.getPlayerData(player).getBoatType();
+				String currentBoatType = plugin.getPlayerData(player).getBoatType();
 				boolean chestBoat = plugin.getPlayerData(player).preferChestBoat();
-				if (currentBoatType == boatType && chestBoat == isChestBoat) {
+				if (currentBoatType.equals(boatType) && chestBoat == isChestBoat) {
 					meta.addEnchant(Enchantment.UNBREAKING, 1, true);
 				} else {
 					meta.removeEnchant(Enchantment.UNBREAKING);

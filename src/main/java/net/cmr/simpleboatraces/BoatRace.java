@@ -17,8 +17,6 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.configuration.serialization.ConfigurationSerializable;
 import org.bukkit.entity.Boat;
-import org.bukkit.entity.Boat.Type;
-import org.bukkit.entity.ChestBoat;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -519,15 +517,8 @@ public class BoatRace {
 			
 			boolean chestBoat = plugin.getPlayerData(player).preferChestBoat();
 			
-			Boat playerBoat;
-			if (chestBoat) {
-				playerBoat = player.getWorld().spawn(loc, ChestBoat.class);
-			} else {
-				playerBoat = player.getWorld().spawn(loc, Boat.class);
-			}
+			Boat playerBoat = (Boat) Utils.spawnBoat(player.getWorld(), loc, plugin.getPlayerData(player).toString(), chestBoat);
 			
-			Type type = plugin.getPlayerData(player).getBoatType();
-			playerBoat.setBoatType(type);
 			playerBoat.addPassenger(player);
 			playerBoat.setInvulnerable(true);
 			playerBoats.add(playerBoat);

@@ -10,7 +10,6 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.Boat.Type;
 import org.bukkit.entity.Player;
 
 public class PlayerData {
@@ -87,14 +86,12 @@ public class PlayerData {
 		return previousLevel != newLevel;
 	}
 	
-	public Type getBoatType() {
-		String storedValue = config.getString(BOAT_SELECTION_KEY, Type.OAK.name());
-		Type parsedValue = Type.valueOf(storedValue);
-		if (parsedValue == null) parsedValue = Type.OAK;
-		return parsedValue;
+	public String getBoatType() {
+		String storedValue = config.getString(BOAT_SELECTION_KEY, "OAK");
+		return storedValue;
 	}
-	public void setBoatType(Type type) {
-		config.set(BOAT_SELECTION_KEY, type.name());
+	public void setBoatType(String boatType) {
+		config.set(BOAT_SELECTION_KEY, boatType);
 		onChangeConfig();
 	}
 	

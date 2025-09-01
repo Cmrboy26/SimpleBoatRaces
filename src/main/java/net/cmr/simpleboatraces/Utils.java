@@ -1,16 +1,16 @@
 package net.cmr.simpleboatraces;
 
+import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.entity.Boat;
-import org.bukkit.entity.Boat.Type;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 
 public class Utils {
 
-	public static Material getBoatItem(Boat.Type type, boolean chestBoat) {
-		String desiredBoatName = type.name()+"_"+(chestBoat ? "CHEST_BOAT" : "BOAT");
-		if (type == Type.BAMBOO) {
-			desiredBoatName = desiredBoatName.replaceAll("BOAT", "RAFT");
-		}
+	public static Material getBoatItem(String boatType, boolean chestBoat) {
+		String desiredBoatName = boatType + (chestBoat ? "_CHEST" : "") + (boatType.contains("BAMBOO") ? "_RAFT" : "_BOAT");
 		Material boatItemMaterial = Material.valueOf(desiredBoatName);
 		return boatItemMaterial;
 	}
@@ -29,4 +29,10 @@ public class Utils {
 		return String.valueOf(chars);
 	}
 	
+	public static Boat spawnBoat(World world, Location loc, String boatType, boolean chestBoat) {
+		String desiredBoatName = boatType + (chestBoat ? "_CHEST" : "") + (boatType.contains("BAMBOO") ? "_RAFT" : "_BOAT");
+		EntityType entityType = EntityType.valueOf(desiredBoatName);
+		return (Boat) world.spawnEntity(loc, entityType);
+	}
+
 }
